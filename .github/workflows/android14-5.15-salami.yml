@@ -78,8 +78,8 @@ jobs:
         cd $GITHUB_WORKSPACE
         git clone https://github.com/DaniAsh551/GKI-Custom.git gki-patch
         cd ./android-kernel/common
-        cat ../../gki-patch/config/salami-android14-5.15_defconfig > ./android-kernel/common/arch/arm64/configs/gki_defconfig
-        cat ../../gki-patch/config/salami-android14-5.15_defconfig > ./android-kernel/common/arch/arm64/configs/kalama_gki_defconfig
+        cat ../../gki-patch/config/salami-android14-5.15_defconfig > arch/arm64/configs/gki_defconfig
+        cat ../../gki-patch/config/salami-android14-5.15_defconfig > arch/arm64/configs/kalama_gki_defconfig
         git apply $GITHUB_WORKSPACE/gki-patch/patchs/*.patch
         ls ../../gki-patch/modded/**/*.* | awk -F '../../gki-patch/modded/' '{print $2}' | awk '{ print "cat ../../gki-patch/modded/"$0">"$0 }' | sh
 
