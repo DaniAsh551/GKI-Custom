@@ -81,7 +81,7 @@ jobs:
         cat ../../gki-patch/config/salami-android14-5.15_defconfig > ./android-kernel/common/arch/arm64/configs/gki_defconfig
         cat ../../gki-patch/config/salami-android14-5.15_defconfig > ./android-kernel/common/arch/arm64/configs/kalama_gki_defconfig
         git apply $GITHUB_WORKSPACE/gki-patch/patchs/*.patch
-        find ../../gki-patch/modded -type f | awk -F '../../gki-patch/modded/' '{print $2}' | awk '{ print "cat ../../gki-patch/modded/"$0">"$0 }' | sh
+        ls ../../gki-patch/modded/**/*.* | awk -F '../../gki-patch/modded/' '{print $2}' | awk '{ print "cat ../../gki-patch/modded/"$0">"$0 }' | sh
 
     # KernelSU already applied, so skip
     # - name: KernelSU
