@@ -1,38 +1,33 @@
-name: Android14-5.15-salami
+name: Android14-5.15-Custom
 
 on: 
   workflow_dispatch:
     inputs:
       os_patch_level:
-        required: false
+        required: true
         type: string
-        default: 2025-07
         description: >
           Patch level of common kernel manifest,
-          for example: 2025-07
+          for example: 2024-04
       os_version:
-        required: false
-        default: 15.0.0
+        required: true
         type: string
         description: >
           OS Version of boot image
-          for example: 15.0.0
+          for example: 12.0.0
       version_name:
-        required: false
-        default: android14-5.15.185
+        required: true
         type: string
         description: >
           With SUBLEVEL of kernel,
-          for example: android14-5.15.185
+          for example: android14-5.15.123
       custom:
-        required: false
-        default: true
+        required: true
         type: boolean
         description: >
           Enable LXC, Docker
       kernelsu:
-        required: false
-        default: true
+        required: true
         type: boolean
         description: >
           Enable KernelSU
@@ -46,7 +41,7 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt install repo wget dwarves -y
+        sudo apt install repo wget -y
 
     - name: Install latest repo tool
       run: |
@@ -61,69 +56,27 @@ jobs:
         cd $GITHUB_WORKSPACE
         mkdir android-kernel
         cd android-kernel
-        # it seems the revision with the least diff with is actually this one from Android 13:
-        # https://github.com/KDEFFALT/kernel_common-5.15/commit/09996673e3139a6d86fc3d95c852b3a020e2fe5f
         repo init --depth 1 -u https://android.googlesource.com/kernel/manifest -b common-android14-5.15-${{ inputs.os_patch_level }}
         repo sync
-
-    - name: Replace pure GKI by salami GKI
-      run: |
         cd $GITHUB_WORKSPACE/android-kernel
         mv common common_pure_gki
         git clone --depth=1 https://github.com/crdroidandroid/android_kernel_oneplus_sm8550 common
 
     - name: Apply patches and configuration files and replace modded files
-      if: ${{ inputs.custom == true }}
       run: |
         cd $GITHUB_WORKSPACE
         git clone https://github.com/DaniAsh551/GKI-Custom.git gki-patch
+        cp ./gki-patch/config/salami-android14-5.15_defconfig ./android-kernel/common/arch/arm64/configs/gki_defconfig
         cd ./android-kernel/common
-        cat ../../gki-patch/config/salami-android14-5.15_defconfig > arch/arm64/configs/gki_defconfig
-        cat ../../gki-patch/config/salami-android14-5.15_defconfig > arch/arm64/configs/kalama_gki_defconfig
         git apply $GITHUB_WORKSPACE/gki-patch/patchs/*.patch
         ls ../../gki-patch/modded/**/*.* | awk -F '../../gki-patch/modded/' '{print $2}' | awk '{ print "cat ../../gki-patch/modded/"$0">"$0 }' | sh
-
-    # KernelSU already applied, so skip
-    # - name: KernelSU
-    #   if: ${{ inputs.kernelsu == true }}
-    #   run: |
-    #       cd $GITHUB_WORKSPACE/android-kernel
-    #       curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
     - name: Build Kernel
       run: |
         cd $GITHUB_WORKSPACE/android-kernel
         echo "ls"
         ls
-        echo "ls build"
-        ls build
-        echo "head -n 10 common/Makefile"
-        head -n 10 common/Makefile
-        # BUILD_CONFIG=common/build.config.gki.aarch64 build/config.sh savedefconfig
-        # LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
-        export ARCH=arm64
-        sed -i 's/CONFIG_DEBUG_INFO_BTF=y/CONFIG_DEBUG_INFO_BTF=n/' common/arch/arm64/configs/kalama_gki_defconfig
-        sed -i 's/CONFIG_DEBUG_INFO_BTF_MODULES=y/CONFIG_DEBUG_INFO_BTF_MODULES=n/' common/arch/arm64/configs/kalama_gki_defconfig
-        echo "will do build/config.sh"
-        #BUILD_CONFIG=common/build.config.gki.aarch64 build/config.sh savedefconfig
-        BUILD_CONFIG=common/build.config.gki.aarch64 build/config.sh kalama_gki_defconfig
-        # BUILD_CONFIG=common/build.config.gki.aarch64 KERNEL_DEFCONFIG=kalama_gki_defconfig build/config.sh savedefconfig
-        #ls -la .
-        #echo "build.sh --config done"
-        gcc common/scripts/sign-file.c -o common/scripts/sign-file -lssl -lcrypto
-        ls -la /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/common/scripts/sign-file
-        cd common
-        openssl req -new -x509 -newkey rsa:4096 -keyout certs/signing_key.pem -out certs/signing_key.x509 -nodes -days 36500 -subj "/CN=Custom Kernel Module Signing/"
-        ls certs
-        cd ..
-        #echo "-----------------------------------"
-        sed -i '/build_system_dlkm/i   cp /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/common/certs/signing_key.pem /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/out/android14-5.15/common/certs/signing_key.pem; cp /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/common/certs/signing_key.x509 /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/out/android14-5.15/common/certs/signing_key.x509; cp /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/common/scripts/sign-file /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/out/android14-5.15/common/scripts/sign-file' build/build.sh
-        #cat build/build.sh
-        #ls /home/runner/work/GKI-Custom/GKI-Custom/android-kernel/build/
-        #ls build
-        #echo "***********************************"
-        cp build/kernel/gettop.sh build/gettop.sh
-        KCFLAGS="-g0 -Wno-error" LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh -j2
+        tools/bazel build //common:kernel_aarch64_dist
 
     - name: Prepare artifacts
       id: prepareArtifacts
